@@ -3,27 +3,25 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
 using System.Data;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+using System.Diagnostics;
+using static System.Net.Mime.MediaTypeNames;
 
-namespace FishCountImageUpload
+namespace TKSE.FishID.Web
 {
     public partial class _Default : Page
     {
         protected void Page_Load(object sender, EventArgs e)
         {
-
             if (!IsPostBack)
             {
                 lblMessage.Visible = false;
-                hyperlink.Visible = false;
                 lblMessage2.Visible = false;
             }
-
         }
 
         protected void BtnUpload_Click(object sender, EventArgs e)
@@ -38,10 +36,10 @@ namespace FishCountImageUpload
             {
                 Stream stream = postedFile.InputStream;
                 BinaryReader binaryReader = new BinaryReader(stream);
-                Byte[] bytes = binaryReader.ReadBytes((int)stream.Length);
-
+                byte[] bytes = binaryReader.ReadBytes((int)stream.Length);
 
                 string cs = ConfigurationManager.ConnectionStrings["DBCS1"].ConnectionString;
+
                 using (SqlConnection con = new SqlConnection(cs))
                 {
                     SqlCommand cmd = new SqlCommand("spUploadImage", con);
@@ -49,7 +47,7 @@ namespace FishCountImageUpload
 
                     SqlParameter paramName = new SqlParameter()
                     {
-                        ParameterName = @"Name",
+                        ParameterName = "@Name",
                         Value = filename
                     };
                     cmd.Parameters.Add(paramName);
@@ -90,26 +88,30 @@ namespace FishCountImageUpload
                     lblMessage.Visible = true;
                     lblMessage.ForeColor = System.Drawing.Color.Green;
                     lblMessage.Text = "Upload Successful";
-                    hyperlink.Visible = true;
-                    hyperlink.NavigateUrl = "~/WebForm2.aspx?Id=" +
-                        cmd.Parameters["@NewId"].Value.ToString();
+
                 }
             }
             else
             {
                 lblMessage.Visible = true;
                 lblMessage.ForeColor = System.Drawing.Color.Red;
-                lblMessage.Text = "Only images (.jpg, .png, .gif and .bmp) can be uploaded";
-                hyperlink.Visible = false;
+                lblMessage.Text = "Only images (.jpg, .png, .gif, and .bmp) can be uploaded";
+
             }
         }
 
         protected void BtnCount_Click(object sender, EventArgs e)
         {
-            // Provide the path to the MLModel1_ConsoleApp3.exe file in your project's output directory.
-            string consoleAppPath = @"C:\inetpub\wwwroot\GoldFishCountMLModelConsoleApp\GoldFishCounterMLModel_ConsoleApp.exe";
-            //string consoleAppPath = @"C:\inetpub\wwwroot\web\project\bin\MLModel1_ConsoleApp3.exe";
+            string consoleAppPath = @"C:\inetpub\wwwroot\FishIDCPU\TKSE_FishClassification_MLModel_ConsoleApp_CPU.exe";
+                System.Diagnostics.Process Proc = new System.Diagnostics.Process();
+                //Proc.StartInfo.FileName = @"C:\inetpub\wwwroot\FishIDCPU\TKSE_FishClassification_MLModel_ConsoleApp_CPU.exe";
+                //Proc.Start();
 
+
+            //if (Proc.Start() == true)
+            //{
+            //    Response.Write("App Executed");
+            //}
 
             try
             {
@@ -118,7 +120,7 @@ namespace FishCountImageUpload
                     FileName = consoleAppPath,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    UseShellExecute = false,
+                    UseShellExecute = false,   //==================== Should be false
                     CreateNoWindow = true
                 };
 
@@ -134,47 +136,49 @@ namespace FishCountImageUpload
 
                     if (!string.IsNullOrWhiteSpace(output))
                     {
-
                         string[] lines = output.Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
-                        // Output from the console application (if any).
-                        // You can display it in a label or any other control on your web page.
                         lblMessage2.Visible = true;
                         lblMessage2.ForeColor = System.Drawing.Color.Green;
-                        //lblMessage2.Text = output;
                         lblMessage2.Text = string.Join("<br/>", lines);
                     }
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        // Error from the console application (if any).
-                        // You can display it in a label or any other control on your web page.
-                        lblMessage.Visible = true;
+                        lblMessage.Visible = true;  //=============== shold be false to hide  the errors
                         lblMessage.ForeColor = System.Drawing.Color.Red;
                         lblMessage.Text = error;
                     }
 
-                    string cs = ConfigurationManager.ConnectionStrings["DBCS1"].ConnectionString;
-                    using (SqlConnection con = new SqlConnection(cs))
-                    {
-                        SqlCommand cmd = new SqlCommand("spGetLatestImage", con); // Modified stored procedure name
-                        cmd.CommandType = CommandType.StoredProcedure;
-
-                        con.Open();
-                        byte[] bytes = (byte[])cmd.ExecuteScalar();
-                        string strBase64 = Convert.ToBase64String(bytes);
-                        Image1.ImageUrl = "data:image/png;base64," + strBase64; // Make sure to use the appropriate image format here
-                    }
-
+                    // Call the ImageView method to display the latest image
+                    ImageView();
                 }
             }
             catch (Exception ex)
             {
-                // Handle any exceptions that might occur during the process execution.
                 lblMessage.Visible = true;
                 lblMessage.ForeColor = System.Drawing.Color.Red;
                 lblMessage.Text = $"Error executing the console application: {ex.Message}";
             }
         }
-       
+
+        // Modified the ImageView method to update the Image control
+        private void ImageView()
+        {
+            string cs = ConfigurationManager.ConnectionStrings["DBCS1"].ConnectionString;
+
+            using (SqlConnection con = new SqlConnection(cs))
+            {
+                SqlCommand cmd = new SqlCommand("spGetLatestImage", con);
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                con.Open();
+                byte[] bytes = (byte[])cmd.ExecuteScalar();
+                string strBase64 = Convert.ToBase64String(bytes);
+                Image1.ImageUrl = "data:image/png;base64," + strBase64;
+            }
+        }
+
+
+
     }
 }
